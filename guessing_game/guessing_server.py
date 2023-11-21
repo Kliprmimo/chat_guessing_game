@@ -33,7 +33,7 @@ def get_line(client_socket) -> str:
             print(f"Received message from {client_socket.getpeername()}: {data}")
             return data.replace('\r\n', '').replace('\n', '')
 
-def handle_client(client_socket, clients, start_game, turn_thread_events, word_obfuscated, game_finished)-> None:
+def handle_client(client_socket, clients, start_game, turn_thread_events, word, word_obfuscated, letters:list, game_finished)-> None:
     client_socket.send(('Please enter your name: ').encode('utf-8'))
     name = get_line(client_socket)
     data = ''
@@ -41,10 +41,28 @@ def handle_client(client_socket, clients, start_game, turn_thread_events, word_o
     client_socket.send((f'The game has begun! Wait for you turn , word is {len(word_obfuscated)} letters long\n send single letter or !<word> to guess\n').encode('utf-8'))
     while not game_finished.is_set():
         turn_thread_events[client_socket].wait()
-        client_socket.send(('Your turn to enter a letter: ').encode('utf-8'))
-        letter = get_line(client_socket)
-        if len(letter) == 1:
-            pass
+        letters_string  = ' ,'.join(letters)
+        client_socket.send((f'Your turn to enter a letter, word: {word_obfuscated}\nletters used: {letters_string}\n').encode('utf-8'))
+        input = get_line(client_socket)
+        if len(input) == 1:
+            if input in word and input not in letters:
+                word_obfuscated = word_obfuscation( word_obfuscated, letters)
+                client_socket.send((f'Congrats, your letter is correct! word after your guess: {word_obfuscated}\n').encode('utf-8'))
+            elif input in letters:
+                client_socket.send((f'Letter was already used! You wasted your turn\n').encode('utf-8'))
+            elif input not in word:
+                client_socket.send((f'Your letter was incorrect! Good luck next time!\n').encode('utf-8'))
+            else:
+                print(f'There seems to be an error in hadndle_client with letter: {input}')
+        else:
+            if input[0] == '!':
+                if word == input[1:]:
+                    client_socket.send((f'Congrats, your guess is correct! word: {word}\n').encode('utf-8'))
+                    game_finished.set()
+                else:
+                    client_socket.send((f'Your guess is not correct! word: {word_obfuscated}\n').encode('utf-8'))
+
+            #to_do check logic
 
 
 
@@ -90,10 +108,10 @@ def turn_management(turn_thread_events: dict) -> None:
          turn_thread_events[client].set()
          time.sleep(10)
 
-
 def server_logic():
+    letters = []
     word = get_word()
-    word_obfuscated = word_obfuscation(word, [])
+    word_obfuscated = word_obfuscation(word, letters)
     PORT = 12345
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('0.0.0.0', PORT))  
@@ -120,11 +138,10 @@ def server_logic():
                 announcment_thread.start()
                 game_start_thread.start()
                 turn_management(turn_thread_events)
-            client_handler = threading.Thread(target=handle_client, args=(client, clients, start_game, turn_thread_events, word_obfuscated, game_finished))
+            client_handler = threading.Thread(target=handle_client, args=(client, clients, start_game, turn_thread_events, word, word_obfuscated, letters ,game_finished))
             client_handler.start()
         else:
             break
-
 
 if __name__ == "__main__":
     server_logic()
