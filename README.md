@@ -1,2 +1,6 @@
-﻿# chat_guessing_game
-you need to add your own slowa.txt in guessing_game for guessing_server to work
+﻿# sysop
+solutions from sysop course that include dining philosophers problems, ssl encrypted chat app, guessing game like hangman over sockets\
+usefull Libraries i used:
+* sockets
+* threading
+* ssl
